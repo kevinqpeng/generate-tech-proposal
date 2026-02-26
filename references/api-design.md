@@ -374,7 +374,211 @@ public class ModuleRespVO {
 - `crm:lead-pool:update`
 - `crm:lead-pool:delete`
 
-## 7. 接口文档模板
+## 7. 多语言字段设计
+
+### 7.1 多语言注解说明
+
+项目使用 `@Translate` 和 `@TranslateDomain` 注解实现业务数据的多语言支持。
+
+#### @TranslateDomain（类级注解）
+
+标记在 VO 类上，声明所属业务模块：
+
+```java
+@TranslateDomain(module = "crm-lead")
+public class LeadPoolRespVO {
+    // ...
+}
+```
+
+**参数说明**:
+- `module`: 模块编码（如：product、system、crm-lead）
+- `recursive`: 是否递归处理嵌套对象（默认 false）
+
+#### @Translate（字段级/方法级注解）
+
+**字段级使用**：标记需要多语言处理的业务字段
+
+```java
+@Translate(domain = "leadPool", name = "brandName", id = "id")
+private String brandName;
+@Schema(description = "品牌名称多语言")
+private Map<String, String> brandNameML;
+```
+
+**方法级使用**：标记在 Controller 方法上，启用多语言处理
+
+```java
+@GetMapping("/page")
+@Translate  // 启用多语言处理
+public CommonResult<PageResult<LeadPoolRespVO>> getPage(@Valid LeadPoolPageReqVO pageReqVO) {
+    // ...
+}
+```
+
+**参数说明**:
+- `domain`: 业务域（如：product、leadPool、leadSource）
+- `name`: 字段名（如：productName、brandName）
+- `id`: ID 字段名（默认 "id"）
+- `idMethod`: ID 获取方法名（适用于组合 ID）
+- `module`: 模块编码（优先级高于 @TranslateDomain）
+- `suffix`: 多语言 Map 字段后缀（默认 "ML"）
+- `scope`: 作用域（TENANT-租户维度，GLOBAL-全局维度）
+- `client`: 客户端类型（AUTO-自动从请求头获取）
+
+### 7.2 多语言字段命名规范
+
+| 原字段名 | 多语言 Map 字段名 | 说明 |
+|---------|-----------------|------|
+| brandName | brandNameML | 品牌名称多语言 |
+| companyName | companyNameML | 公司名称多语言 |
+| address | addressML | 地址多语言 |
+| remark | remarkML | 备注多语言 |
+
+**命名规则**: `{原字段名} + ML`（ML = MultiLanguage）
+
+### 7.3 多语言字段设计示例
+
+#### 响应对象（RespVO）
+
+```java
+@Schema(description = "管理后台 - 品牌信息 Response VO")
+@Data
+@TranslateDomain(module = "crm-lead")
+public class BrandRespVO {
+
+    @Schema(description = "品牌ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "1")
+    private Long id;
+
+    @Schema(description = "品牌名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "海底捞")
+    private String brandName;
+    // 注意：brandName 不需要 @Translate，因为需求明确"无需多语言"
+
+    @Schema(description = "品牌描述", example = "知名火锅品牌")
+    @Translate(domain = "brand", name = "brandDesc", id = "id")
+    private String brandDesc;
+    @Schema(description = "品牌描述多语言")
+    private Map<String, String> brandDescML;
+
+    @Schema(description = "品牌国家/地区", example = "CN")
+    private String brandCountry;
+
+    @Schema(description = "创建时间", requiredMode = Schema.RequiredMode.REQUIRED)
+    private LocalDateTime createTime;
+}
+```
+
+#### 保存对象（SaveReqVO）
+
+```java
+@Schema(description = "管理后台 - 品牌保存 Request VO")
+@Data
+@TranslateDomain(module = "crm-lead")
+public class BrandSaveReqVO {
+
+    @Schema(description = "品牌ID", example = "1")
+    private Long id;
+
+    @Schema(description = "品牌名称", requiredMode = Schema.RequiredMode.REQUIRED, example = "海底捞")
+    @NotBlank(message = "品牌名称不能为空")
+    private String brandName;
+
+    @Schema(description = "品牌描述", example = "知名火锅品牌")
+    @Translate(domain = "brand", name = "brandDesc", id = "id")
+    private String brandDesc;
+    @Schema(description = "品牌描述多语言")
+    private Map<String, String> brandDescML;
+
+    @Schema(description = "品牌国家/地区", requiredMode = Schema.RequiredMode.REQUIRED, example = "CN")
+    @NotBlank(message = "品牌国家/地区不能为空")
+    private String brandCountry;
+}
+```
+
+### 7.4 Controller 多语言处理
+
+在 Controller 方法上添加 `@Translate` 注解启用多语言处理：
+
+```java
+@RestController
+@RequestMapping("/api/crm/brand")
+@Tag(name = "品牌管理")
+public class BrandController {
+
+    @GetMapping("/page")
+    @Operation(summary = "获取品牌分页")
+    @PreAuthorize("@ss.hasPermission('crm:brand:query')")
+    @Translate  // 处理响应数据的多语言字段填充
+    public CommonResult<PageResult<BrandRespVO>> getBrandPage(
+        @Valid BrandPageReqVO pageReqVO) {
+
+        PageResult<BrandDO> pageResult = brandService.getBrandPage(pageReqVO);
+        return success(BrandConvert.INSTANCE.convertPage(pageResult));
+    }
+
+    @GetMapping("/get")
+    @Operation(summary = "获取品牌详情")
+    @PreAuthorize("@ss.hasPermission('crm:brand:query')")
+    @Translate  // 处理响应数据的多语言字段填充
+    public CommonResult<BrandRespVO> getBrand(@RequestParam("id") Long id) {
+        BrandDO brand = brandService.getBrand(id);
+        return success(BrandConvert.INSTANCE.convert(brand));
+    }
+
+    @PostMapping("/save")
+    @Operation(summary = "保存品牌")
+    @PreAuthorize("@ss.hasPermission('crm:brand:create')")
+    @Translate  // 处理请求数据的多语言字段保存
+    public CommonResult<Long> saveBrand(@Valid @RequestBody BrandSaveReqVO saveReqVO) {
+        Long id = brandService.saveBrand(saveReqVO);
+        return success(id);
+    }
+}
+```
+
+### 7.5 多语言字段使用场景
+
+#### 需要多语言的场景
+
+- 用户输入的业务数据（品牌描述、公司名称、地址、备注等）
+- 需要在不同语言环境下展示不同内容的字段
+- 跨国业务场景下的关键信息字段
+
+#### 不需要多语言的场景
+
+- 系统生成的编号（如：leadNo、brandNo）
+- 枚举值和字典码（如：status、type）
+- 数值类型（如：金额、数量、百分比）
+- 日期时间（如：createTime、updateTime）
+- 标识符（如：id、userId、tenantId）
+- 品牌名称等专有名词（根据业务需求决定）
+
+### 7.6 多语言数据存储
+
+多语言数据存储在独立的多语言表中，通过 AOP 自动处理：
+
+- **读取时**: 根据当前语言环境自动填充 `xxxML` Map 字段
+- **保存时**: 自动将 `xxxML` Map 数据保存到多语言表
+- **更新时**: 自动更新多语言表中的对应记录
+
+**多语言表结构示例**:
+
+```sql
+CREATE TABLE `system_i18n_data` (
+  `id` BIGINT NOT NULL COMMENT '主键ID',
+  `module` VARCHAR(64) NOT NULL COMMENT '模块编码',
+  `domain` VARCHAR(64) NOT NULL COMMENT '业务域',
+  `name` VARCHAR(64) NOT NULL COMMENT '字段名',
+  `ref_id` BIGINT NOT NULL COMMENT '关联业务ID',
+  `lang_code` VARCHAR(16) NOT NULL COMMENT '语言编码(如:zh-CN,en-US)',
+  `content` TEXT COMMENT '翻译内容',
+  `tenant_id` BIGINT NOT NULL DEFAULT 0 COMMENT '租户编号',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_module_domain_name_ref_lang` (`module`, `domain`, `name`, `ref_id`, `lang_code`, `tenant_id`)
+) COMMENT='多语言数据表';
+```
+
+## 8. 接口文档模板
 
 ```markdown
 ### 4.1 Controller 接口
