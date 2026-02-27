@@ -6,7 +6,7 @@
 
 - ✅ **数据库设计规范** - 表清单、ER 图（简化/详细两种格式）、建表 SQL、表关系说明
 - ✅ **接口设计规范** - Controller/Service/Mapper 三层架构设计
-- ✅ **业务流程设计** - Mermaid 流程图、流程说明、异常处理
+- ✅ **业务流程设计** - Mermaid 时序图（sequenceDiagram）、流程说明、异常处理
 - ✅ **文档结构模板** - 统一的章节结构和格式规范
 - ✅ **完整示例** - 基于真实项目的设计示例
 - ✅ **详细 ER 图** - 包含完整表结构、字段类型、约束和注释的 ER 图
@@ -102,7 +102,7 @@ generate-tech-proposal/
 - Mapper 接口（数据访问层）
 
 ### 5. 核心业务流程
-- 流程图（Mermaid flowchart）
+- 流程图（Mermaid 时序图 sequenceDiagram）
 - 流程说明
 - 异常处理
 
@@ -112,7 +112,7 @@ generate-tech-proposal/
 
 ## 技术栈
 
-- **图表工具**: Mermaid（ER 图、流程图）
+- **图表工具**: Mermaid（ER 图、时序图 sequenceDiagram）
 - **文档格式**: Markdown
 - **代码示例**: Java/Spring Boot
 

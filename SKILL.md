@@ -144,6 +144,28 @@ erDiagram
 
 ### 流程图示例
 
+**默认使用时序图（sequenceDiagram）** 来描述核心业务流程：
+
+```mermaid
+sequenceDiagram
+    participant 用户
+    participant Controller
+    participant Service
+    participant Mapper
+    participant DB as 数据库
+
+    用户->>Controller: 发起请求
+    Controller->>Service: 调用业务逻辑
+    Service->>Mapper: 查询数据
+    Mapper->>DB: SQL 查询
+    DB-->>Mapper: 返回结果
+    Mapper-->>Service: 返回 DO
+    Service-->>Controller: 返回 VO
+    Controller-->>用户: 返回响应
+```
+
+对于简单流程，可以使用 flowchart：
+
 ```mermaid
 flowchart TD
     A[开始] --> B{条件判断}

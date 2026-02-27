@@ -2,6 +2,8 @@
 
 本文档定义业务流程的设计规范、流程图绘制方法和描述格式。
 
+**重要：默认使用时序图（sequenceDiagram）** 来描述核心业务流程，清晰展示系统组件之间的交互和数据流转。
+
 ## 1. 业务流程章节结构
 
 ```markdown
@@ -12,8 +14,15 @@
 #### 流程图
 
 ​```mermaid
-flowchart TD
-    ...
+sequenceDiagram
+    participant A as 参与者A
+    participant B as 参与者B
+    participant C as 参与者C
+
+    A->>B: 操作1
+    B->>C: 操作2
+    C-->>B: 返回结果
+    B-->>A: 返回结果
 ​```
 
 #### 流程说明
@@ -31,20 +40,314 @@ flowchart TD
 ...
 ```
 
-## 2. Mermaid 流程图语法
+## 2. 时序图（sequenceDiagram）- 主要格式
 
 ### 2.1 基本语法
 
+时序图用于展示系统组件之间的交互顺序和消息传递，是描述业务流程的首选方式。
+
 ```mermaid
-flowchart TD
-    A[开始] --> B{条件判断}
-    B -->|是| C[执行操作]
-    B -->|否| D[跳过]
-    C --> E[结束]
-    D --> E
+sequenceDiagram
+    participant 用户
+    participant Controller
+    participant Service
+    participant Mapper
+    participant DB as 数据库
+
+    用户->>Controller: 发起请求
+    Controller->>Service: 调用业务逻辑
+    Service->>Mapper: 查询数据
+    Mapper->>DB: SQL 查询
+    DB-->>Mapper: 返回结果
+    Mapper-->>Service: 返回 DO
+    Service-->>Controller: 返回 VO
+    Controller-->>用户: 返回响应
 ```
 
-### 2.2 节点类型
+### 2.2 参与者定义
+
+使用 `participant` 定义参与者，可以使用别名简化图表：
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant C as Controller
+    participant S as Service
+    participant M as Mapper
+    participant DB as 数据库
+```
+
+### 2.3 消息类型
+
+| 语法 | 说明 | 使用场景 |
+|------|------|----------|
+| `A->>B` | 实线箭头（同步调用） | 方法调用、API 请求 |
+| `A-->>B` | 虚线箭头（返回） | 返回结果、响应 |
+| `A->>+B` | 激活参与者 | 开始处理 |
+| `A-->>-B` | 停用参与者 | 处理结束 |
+| `A-)B` | 异步消息 | 异步通知、事件 |
+
+### 2.4 条件分支
+
+使用 `alt`/`else` 表示条件分支：
+
+```mermaid
+sequenceDiagram
+    participant Service
+    participant Mapper
+    participant DB as 数据库
+
+    Service->>Mapper: 查询品牌
+    Mapper->>DB: SELECT
+    DB-->>Mapper: 返回结果
+    alt 品牌不存在
+        Mapper-->>Service: null
+        Service->>Mapper: 创建品牌
+        Mapper->>DB: INSERT
+    else 品牌存在
+        Mapper-->>Service: 已有品牌
+    end
+```
+
+### 2.5 循环
+
+使用 `loop` 表示循环：
+
+```mermaid
+sequenceDiagram
+    participant Service
+    participant Mapper
+
+    loop 遍历每个规则
+        Service->>Mapper: 查询符合条件的线索
+        Mapper-->>Service: 返回线索列表
+    end
+```
+
+### 2.6 注释
+
+使用 `Note` 添加注释说明：
+
+```mermaid
+sequenceDiagram
+    participant Service
+    participant Mapper
+
+    Service->>Mapper: 查询数据
+    Note over Service,Mapper: 这里执行复杂的业务逻辑
+    Mapper-->>Service: 返回结果
+```
+
+## 3. 业务流程示例
+
+### 3.1 客户审批通过后自动创建/关联品牌
+
+#### 流程图
+
+```mermaid
+sequenceDiagram
+    participant Event as BpmProcessInstanceStatusEvent
+    participant Listener as BpmCustomerBrandStatusListener
+    participant SyncService as BrandSyncService
+    participant CustomerMapper as LeadCustomerMapper
+    participant BrandMapper as LeadBrandMapper
+    participant RelMapper as LeadBrandCustomerRelMapper
+    participant DB as 数据库
+
+    Event->>Listener: 审批通过事件
+    Listener->>SyncService: onCustomerApprovePassed(customerId)
+    SyncService->>CustomerMapper: 读取客户品牌信息
+    CustomerMapper->>DB: SELECT brand_name, brand_country
+    DB-->>CustomerMapper: 返回客户数据
+    CustomerMapper-->>SyncService: 返回客户DO
+    SyncService->>BrandMapper: 查询品牌(brand_name + brand_country)
+    BrandMapper->>DB: SELECT
+    DB-->>BrandMapper: 返回查询结果
+    alt 品牌不存在
+        BrandMapper-->>SyncService: null
+        SyncService->>BrandMapper: 创建 lead_brand（状态 NORMAL）
+        BrandMapper->>DB: INSERT
+        DB-->>BrandMapper: 成功
+        BrandMapper-->>SyncService: 新品牌DO
+    else 品牌存在且状态 NORMAL
+        BrandMapper-->>SyncService: 已有品牌DO
+    else 品牌存在但状态异常
+        BrandMapper-->>SyncService: 异常品牌DO
+        SyncService-->>Listener: 抛出业务异常并记录告警
+    end
+    SyncService->>RelMapper: 建立品牌-客户关系（EFFECTIVE）
+    RelMapper->>DB: INSERT lead_brand_customer_rel
+    DB-->>RelMapper: 成功
+    SyncService->>CustomerMapper: 回填 lead_customer.brand_id
+    CustomerMapper->>DB: UPDATE
+    DB-->>CustomerMapper: 成功
+    SyncService-->>Listener: 完成
+```
+
+#### 流程说明
+
+1. **审批事件触发**: 客户审批通过事件触发 `BrandSyncService.onCustomerApprovePassed`
+2. **读取客户信息**: 从 `lead_customer` 表读取客户的品牌名称和国家信息
+3. **查询品牌**: 以 `brand_name + brand_country` 查询品牌是否已存在
+4. **创建或关联品牌**:
+   - 若品牌不存在，则新建品牌，创建者取客户创建者，状态置 `NORMAL`
+   - 若品牌存在且状态正常，则直接关联
+   - 若品牌存在但状态异常，则拒绝关联并记录告警
+5. **建立关系**: 在 `lead_brand_customer_rel` 表中建立品牌-客户关系，状态为 `EFFECTIVE`
+6. **回填品牌ID**: 更新客户表的 `brand_id` 字段，保留原品牌快照字段
+
+#### 异常处理
+
+- **品牌状态非 NORMAL**: 拒绝自动关联并记录审计日志，避免脏数据
+- **唯一键冲突**: 重试一次查询后转为关联路径（防并发双写）
+- **任一数据库操作失败**: 事务回滚，确保数据一致性
+
+### 3.2 客户品牌变更审批流程
+
+#### 流程图
+
+```mermaid
+sequenceDiagram
+    participant 用户
+    participant Controller
+    participant CustomerService as LeadPersonalService
+    participant BrandService as LeadBrandService
+    participant BpmService as 审批服务
+    participant SyncService as BrandSyncService
+    participant DB as 数据库
+
+    用户->>Controller: 提交品牌变更
+    Controller->>CustomerService: 处理客户变更请求
+    CustomerService->>BrandService: validateBrandEditable(brandId)
+    BrandService->>DB: 查询品牌状态
+    DB-->>BrandService: 返回品牌DO
+    alt 状态为 REVIEWING / CHANGE_REVIEWING
+        BrandService-->>CustomerService: 抛出业务异常
+        CustomerService-->>Controller: 拒绝提交
+        Controller-->>用户: 返回错误提示
+    else 允许提交
+        BrandService-->>CustomerService: 校验通过
+        CustomerService->>DB: 品牌状态置 CHANGE_REVIEWING
+        CustomerService->>BpmService: 发起客户变更审批流程
+        BpmService-->>CustomerService: 审批流程已创建
+        CustomerService-->>Controller: 提交成功
+        Controller-->>用户: 返回成功
+        Note over BpmService,SyncService: 审批结果异步回调
+        alt 审批通过
+            BpmService->>SyncService: onCustomerApprovePassed(customerId)
+            SyncService->>DB: 创建/关联品牌，切换关系，置状态 NORMAL
+        else 审批拒绝
+            BpmService->>SyncService: onCustomerApproveRejected(customerId)
+            SyncService->>DB: 品牌状态置 REJECTED，保留原有效关联
+        end
+    end
+```
+
+#### 流程说明
+
+1. **提交变更**: 用户在客户编辑页面提交品牌字段变更
+2. **品牌状态校验**: 先校验品牌当前是否可编辑（状态不能为 `REVIEWING` 或 `CHANGE_REVIEWING`）
+3. **状态标记**: 进入审批后，目标品牌状态标记为 `CHANGE_REVIEWING`，期间前端禁改品牌字段
+4. **发起审批**: 调用审批服务创建客户变更审批流程
+5. **审批通过**: 按新品牌信息完成品牌创建/关联、关系切换、客户 `brand_id` 回填，品牌状态置 `NORMAL`
+6. **审批拒绝**: 品牌状态置 `REJECTED`，保留原有效关联不变
+
+#### 异常处理
+
+- **变更目标与现有品牌一致**: 直接短路，无需审批
+- **审批通过但目标品牌状态异常**: 记录错误并终止生效
+- **关系切换失败**: 事务回滚，审批结果写告警队列人工处理
+
+### 3.3 品牌列表查询流程
+
+#### 流程图
+
+```mermaid
+sequenceDiagram
+    participant 用户
+    participant Controller as LeadBrandController
+    participant Service as LeadBrandService
+    participant BrandMapper as LeadBrandMapper
+    participant DB as 数据库
+
+    用户->>Controller: 请求品牌分页查询
+    Controller-->>Controller: 参数校验
+    Controller->>Service: getBrandPage(reqVO)
+    Service->>BrandMapper: selectPage(reqVO)
+    BrandMapper->>DB: SQL 查询（status=NORMAL，分页+排序）
+    DB-->>BrandMapper: 返回品牌列表
+    BrandMapper-->>Service: 返回 DO 列表
+    Service-->>Service: DO 转 VO，填充多语言字段
+    Service-->>Controller: 返回 PageResult<LeadBrandRespVO>
+    Controller-->>用户: 返回分页结果
+```
+
+#### 流程说明
+
+1. **接收请求**: 用户在品牌管理页面发起分页查询请求
+2. **参数校验**: Controller 层校验请求参数（品牌名、业态、国家、创建人等筛选条件）
+3. **查询数据**: Service 调用 Mapper 执行分页查询，仅查询状态为 `NORMAL` 的品牌
+4. **数据转换**: 将 DO 转换为 VO，填充多语言字段（如品牌描述）
+5. **返回结果**: 返回分页结果，包含品牌列表和分页信息
+
+#### 异常处理
+
+- **查询无数据**: 返回空列表，不抛错
+- **品牌不存在或已删除**: 提示"品牌不存在或已失效"
+
+### 3.4 查看品牌关联客户流程
+
+#### 流程图
+
+```mermaid
+sequenceDiagram
+    participant 用户
+    participant Controller as LeadBrandController
+    participant Service as LeadBrandService
+    participant RelMapper as LeadBrandCustomerRelMapper
+    participant DB as 数据库
+
+    用户->>Controller: 点击查看关联客户（brandId）
+    Controller->>Service: getBrandCustomerPage(reqVO)
+    Service->>RelMapper: 按 brand_id 查询关系表 + 客户表
+    RelMapper->>DB: JOIN 查询（link_status=EFFECTIVE）
+    DB-->>RelMapper: 返回客户列表
+    RelMapper-->>Service: 返回 DO 列表
+    Service-->>Service: DO 转 VO
+    Service-->>Controller: 返回 PageResult<LeadBrandCustomerRespVO>
+    Controller-->>用户: 返回客户弹窗分页数据
+```
+
+#### 流程说明
+
+1. **触发查看**: 用户在品牌列表点击"查看关联客户"按钮
+2. **查询关系**: Service 调用 RelMapper 查询品牌-客户关系表，JOIN 客户表获取客户信息
+3. **过滤条件**: 仅查询关系状态为 `EFFECTIVE` 的有效关联
+4. **数据转换**: 将 DO 转换为 VO，包含客户名称、归属人、归属组织、最后更新时间等
+5. **返回结果**: 返回客户列表分页数据，支持客户名模糊检索
+
+#### 异常处理
+
+- **品牌不存在**: 提示"品牌不存在或已失效"
+- **无关联客户**: 返回空列表
+
+## 4. Flowchart 流程图（备选格式）
+
+对于简单的流程或不涉及多系统交互的场景，可以使用 flowchart 格式：
+
+### 4.1 基本语法
+
+```mermaid
+flowchart TD
+    A([开始]) --> B[步骤1]
+    B --> C{判断}
+    C -->|是| D[步骤2]
+    C -->|否| E[步骤3]
+    D --> F([结束])
+    E --> F
+```
+
+### 4.2 节点类型
 
 | 语法 | 说明 | 示例 |
 |------|------|------|
@@ -54,7 +357,7 @@ flowchart TD
 | `((文本))` | 圆形（连接点） | `((A))` |
 | `[(文本)]` | 圆柱形（数据库） | `[(保存数据)]` |
 
-### 2.3 连接线类型
+### 4.3 连接线类型
 
 | 语法 | 说明 |
 |------|------|
@@ -63,7 +366,7 @@ flowchart TD
 | `==>` | 粗箭头 |
 | `--文本-->` | 带文字的箭头 |
 
-### 2.4 方向控制
+### 4.4 方向控制
 
 | 语法 | 说明 |
 |------|------|
@@ -72,11 +375,7 @@ flowchart TD
 | `BT` | 从下到上 |
 | `RL` | 从右到左 |
 
-## 3. 业务流程示例
-
-### 3.1 待办创建流程
-
-#### 流程图
+### 4.5 Flowchart 示例：待办创建流程
 
 ```mermaid
 flowchart TD
@@ -92,181 +391,7 @@ flowchart TD
     D --> J
 ```
 
-#### 流程说明
-
-1. **接收请求**: 接收前端传入的待办创建请求，包含线索ID、待办类型、计划时间等
-2. **参数校验**: 校验必填字段、时间格式、线索是否存在等
-3. **生成ID**: 使用雪花算法生成待办唯一ID
-4. **设置属性**: 设置待办状态为"待处理"，设置创建人、创建时间等
-5. **计算提醒时间**: 根据计划时间计算提醒时间（提前15分钟）
-6. **保存数据**: 将待办信息保存到 lead_todo 表
-7. **发送通知**: 发送站内消息通知负责人
-
-#### 异常处理
-
-- **参数校验失败**: 返回 400 错误，提示具体校验失败原因
-- **线索不存在**: 返回 404 错误，提示线索不存在
-- **数据库保存失败**: 返回 500 错误，记录错误日志
-
-### 3.2 待办完成（跟进）流程
-
-#### 流程图
-
-```mermaid
-flowchart TD
-    A([开始]) --> B[接收待办完成请求]
-    B --> C{校验待办状态}
-    C -->|已完成| D[返回错误:待办已完成]
-    C -->|待处理| E[更新待办状态为已完成]
-    E --> F[记录完成时间]
-    F --> G[创建跟进记录]
-    G --> H{是否需要更新线索状态}
-    H -->|是| I[更新线索状态]
-    H -->|否| J[(提交事务)]
-    I --> J
-    J --> K[发送完成通知]
-    K --> L([结束])
-    D --> L
-```
-
-#### 流程说明
-
-1. **接收请求**: 接收待办ID和跟进内容
-2. **校验状态**: 检查待办是否已完成，避免重复操作
-3. **更新待办**: 将待办状态更新为"已完成"，记录完成时间和完成人
-4. **创建跟进记录**: 在 lead_follow_record 表中创建跟进记录
-5. **更新线索状态**: 根据业务规则判断是否需要更新线索状态
-6. **提交事务**: 确保待办更新和跟进记录创建的原子性
-7. **发送通知**: 通知相关人员待办已完成
-
-#### 异常处理
-
-- **待办不存在**: 返回 404 错误
-- **待办已完成**: 返回 400 错误，提示待办已完成
-- **事务失败**: 回滚所有操作，返回 500 错误
-
-### 3.3 自动分配执行流程（定时任务）
-
-#### 流程图
-
-```mermaid
-flowchart TD
-    A([定时触发]) --> B[查询启用的分配规则]
-    B --> C{是否有规则}
-    C -->|否| D([结束])
-    C -->|是| E[遍历每个规则]
-    E --> F[查询符合条件的线索]
-    F --> G{是否有线索}
-    G -->|否| H[记录日志:无符合线索]
-    G -->|是| I[获取规则配置的员工列表]
-    I --> J[按分配策略选择员工]
-    J --> K[批量分配线索]
-    K --> L[记录分配日志]
-    L --> M[发送分配通知]
-    M --> N{是否还有规则}
-    N -->|是| E
-    N -->|否| D
-    H --> N
-```
-
-#### 流程说明
-
-1. **定时触发**: 每5分钟执行一次（可配置）
-2. **查询规则**: 查询状态为"启用"的自动分配规则
-3. **遍历规则**: 依次处理每个规则
-4. **查询线索**: 根据规则条件（来源、地区等）查询未分配的线索
-5. **选择员工**: 根据分配策略（轮询、随机、负载均衡）选择员工
-6. **批量分配**: 将线索批量分配给选中的员工
-7. **记录日志**: 在 lead_assign_log 表中记录分配详情
-8. **发送通知**: 通知员工有新线索分配
-
-#### 异常处理
-
-- **规则配置错误**: 跳过该规则，记录错误日志
-- **员工不存在**: 跳过该规则，记录错误日志
-- **分配失败**: 回滚该规则的分配，记录错误日志，继续处理下一个规则
-
-### 3.4 线索回收流程（定时任务）
-
-#### 流程图
-
-```mermaid
-flowchart TD
-    A([定时触发]) --> B[查询超期未跟进的线索]
-    B --> C{是否有线索}
-    C -->|否| D([结束])
-    C -->|是| E[遍历每条线索]
-    E --> F[检查最后跟进时间]
-    F --> G{超过回收期限}
-    G -->|否| H[跳过]
-    G -->|是| I[将线索归属人设为空]
-    I --> J[更新线索状态为未分配]
-    J --> K[记录归属变更日志]
-    K --> L[发送回收通知]
-    L --> M{是否还有线索}
-    M -->|是| E
-    M -->|否| D
-    H --> M
-```
-
-#### 流程说明
-
-1. **定时触发**: 每天凌晨2点执行一次
-2. **查询线索**: 查询已分配但超过N天未跟进的线索（N可配置）
-3. **检查跟进时间**: 计算最后跟进时间距今的天数
-4. **回收线索**: 将超期线索的归属人清空，状态改为"未分配"
-5. **记录日志**: 在 lead_owner_change_log 表中记录归属变更
-6. **发送通知**: 通知原负责人线索已被回收
-
-#### 异常处理
-
-- **线索状态异常**: 跳过该线索，记录警告日志
-- **更新失败**: 跳过该线索，记录错误日志
-
-## 4. 流程描述规范
-
-### 4.1 步骤描述格式
-
-使用有序列表，每个步骤包含：
-- **步骤名称**: 简短描述
-- 详细说明: 具体操作内容
-
-```markdown
-1. **接收请求**: 接收前端传入的待办创建请求，包含线索ID、待办类型、计划时间等
-2. **参数校验**: 校验必填字段、时间格式、线索是否存在等
-```
-
-### 4.2 异常处理格式
-
-使用无序列表，每个异常包含：
-- **异常名称**: 处理方式
-
-```markdown
-- **参数校验失败**: 返回 400 错误，提示具体校验失败原因
-- **线索不存在**: 返回 404 错误，提示线索不存在
-```
-
-## 5. 时序图（可选）
-
-对于涉及多个系统交互的流程，可以使用时序图：
-
-```mermaid
-sequenceDiagram
-    participant 用户
-    participant 前端
-    participant 后端
-    participant 数据库
-
-    用户->>前端: 点击创建待办
-    前端->>后端: POST /api/todo/create
-    后端->>后端: 参数校验
-    后端->>数据库: 保存待办
-    数据库-->>后端: 返回ID
-    后端-->>前端: 返回成功
-    前端-->>用户: 显示成功提示
-```
-
-## 6. 状态机图（可选）
+## 5. 状态机图（可选）
 
 对于有明确状态流转的业务，可以使用状态机图：
 
@@ -281,6 +406,29 @@ stateDiagram-v2
     已失效 --> [*]
 ```
 
+## 6. 流程描述规范
+
+### 6.1 步骤描述格式
+
+使用有序列表，每个步骤包含：
+- **步骤名称**: 简短描述
+- 详细说明: 具体操作内容
+
+```markdown
+1. **接收请求**: 接收前端传入的待办创建请求，包含线索ID、待办类型、计划时间等
+2. **参数校验**: 校验必填字段、时间格式、线索是否存在等
+```
+
+### 6.2 异常处理格式
+
+使用无序列表，每个异常包含：
+- **异常名称**: 处理方式
+
+```markdown
+- **参数校验失败**: 返回 400 错误，提示具体校验失败原因
+- **线索不存在**: 返回 404 错误，提示线索不存在
+```
+
 ## 7. 流程文档模板
 
 ```markdown
@@ -289,13 +437,15 @@ stateDiagram-v2
 #### 流程图
 
 ​```mermaid
-flowchart TD
-    A([开始]) --> B[步骤1]
-    B --> C{判断}
-    C -->|是| D[步骤2]
-    C -->|否| E[步骤3]
-    D --> F([结束])
-    E --> F
+sequenceDiagram
+    participant A as 参与者A
+    participant B as 参与者B
+    participant C as 参与者C
+
+    A->>B: 操作1
+    B->>C: 操作2
+    C-->>B: 返回结果
+    B-->>A: 返回结果
 ​```
 
 #### 流程说明
@@ -323,3 +473,14 @@ flowchart TD
 4. **可追溯性**: 关键操作需要记录日志
 5. **事务性**: 涉及多表操作时注意事务控制
 6. **通知机制**: 重要操作需要通知相关人员
+
+## 9. 图表选择指南
+
+| 场景 | 推荐图表 | 说明 |
+|------|----------|------|
+| 系统组件交互 | 时序图（sequenceDiagram） | 清晰展示调用顺序和数据流转 |
+| 审批流程 | 时序图（sequenceDiagram） | 展示审批各阶段的交互 |
+| 数据查询流程 | 时序图（sequenceDiagram） | 展示查询链路和数据转换 |
+| 简单业务流程 | Flowchart | 快速展示流程步骤 |
+| 状态流转 | 状态机图（stateDiagram） | 展示状态变化规则 |
+| 定时任务 | Flowchart | 展示任务执行逻辑 |
