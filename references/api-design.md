@@ -16,6 +16,13 @@ Mapper 层 (数据访问层)
 - **Service**: 实现业务逻辑，事务控制
 - **Mapper**: 数据库操作，SQL 执行
 
+### 1.1 范围边界与解耦约束（强制）
+
+- 接口设计只展开**当前业务模块**的 Controller/Service/Mapper
+- 外部关联模块仅描述协作边界与对接信息（HTTP/RPC/事件），不展开其内部接口与实现细节
+- 对并行开发中的外部模块，统一标记为“由外部团队负责实现（待联调）”
+- 不在当前方案中定义其他模块的数据库表、Mapper SQL、内部业务流程
+
 ## 2. Controller 接口设计
 
 ### 2.1 基本规范
@@ -612,6 +619,21 @@ public interface LeadMainMapper extends BaseMapperX<LeadMainDO> {
             .likeIfPresent(LeadMainDO::getBrandName, reqVO.getBrandName())
             .orderByDesc(LeadMainDO::getUpdateTime));
     }
+}
+​```
+
+### 4.4 跨模块依赖协作说明（仅描述边界，不展开实现）
+
+| 协作模块 | 接入方式 | 协作接口/事件 | 关键入参 | 关键出参 | 责任团队 | 状态 |
+|----------|----------|----------|----------|----------|----------|------|
+| customer | RPC | CustomerFacade#getById | customerId | customerName,status | 客户域团队 | 建设中（外部团队） |
+| workflow | 事件 | lead.approved | leadId,operatorId | approveResult | 流程域团队 | 待联调 |
+
+​```java
+public interface CustomerGateway {
+
+    // 外部协作接口：查询客户基础信息（由客户域团队负责实现）
+    CustomerDTO getById(Long customerId);
 }
 ​```
 ```
