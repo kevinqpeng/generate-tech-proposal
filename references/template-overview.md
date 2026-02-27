@@ -47,9 +47,14 @@
 
 **必须包含**:
 - 表清单：序号、表名、说明的表格
-- ER 图：使用 Mermaid erDiagram 绘制
+- ER 图：使用 Mermaid erDiagram 绘制（**默认使用详细格式**，包含完整表结构、字段类型、约束）
 - 表关系说明：描述表之间的关联关系（1:1, 1:N, N:M）
 - 建表 SQL：完整的 CREATE TABLE 语句
+
+**ER 图格式要求**:
+- **默认使用详细格式**：包含所有字段、类型、约束（PK/FK/UK）、注释
+- 字段顺序：主键 → 业务字段 → 标准字段
+- 标准字段必须包含：creator, create_time, updater, update_time, deleted, tenant_id
 
 **示例格式**:
 ```markdown
@@ -59,6 +64,39 @@
 |------|------|------|
 | 1 | user | 用户表 |
 | 2 | order | 订单表 |
+
+### 1.2 ER 图
+
+​```mermaid
+erDiagram
+    user {
+        bigint id PK "雪花算法"
+        varchar username UK "用户名"
+        varchar password "密码(加密)"
+        varchar creator "创建者"
+        datetime create_time "创建时间"
+        varchar updater "更新者"
+        datetime update_time "更新时间"
+        tinyint deleted "是否删除:0-否,1-是"
+        bigint tenant_id "租户编号"
+    }
+
+    order {
+        bigint id PK "雪花算法"
+        varchar order_no UK "订单编号"
+        bigint user_id FK "用户ID(user.id)"
+        decimal total_amount "订单总金额"
+        varchar order_status "订单状态:PENDING/PAID/COMPLETED"
+        varchar creator "创建者"
+        datetime create_time "创建时间"
+        varchar updater "更新者"
+        datetime update_time "更新时间"
+        tinyint deleted "是否删除:0-否,1-是"
+        bigint tenant_id "租户编号"
+    }
+
+    user ||--o{ order : "1:N 一个用户多个订单"
+​```
 ```
 
 ### 2. 架构设计
@@ -142,10 +180,37 @@ CREATE TABLE user (
 
 使用 Mermaid 代码块：
 
+**ER 图（默认使用详细格式）**:
+
 ```markdown
 ​```mermaid
 erDiagram
-    USER ||--o{ ORDER : places
+    user {
+        bigint id PK "雪花算法"
+        varchar username UK "用户名"
+        varchar password "密码(加密)"
+        varchar creator "创建者"
+        datetime create_time "创建时间"
+        varchar updater "更新者"
+        datetime update_time "更新时间"
+        tinyint deleted "是否删除:0-否,1-是"
+        bigint tenant_id "租户编号"
+    }
+
+    order {
+        bigint id PK "雪花算法"
+        varchar order_no UK "订单编号"
+        bigint user_id FK "用户ID(user.id)"
+        decimal total_amount "订单总金额"
+        varchar creator "创建者"
+        datetime create_time "创建时间"
+        varchar updater "更新者"
+        datetime update_time "更新时间"
+        tinyint deleted "是否删除:0-否,1-是"
+        bigint tenant_id "租户编号"
+    }
+
+    user ||--o{ order : "1:N 一个用户多个订单"
 ​```
 ```
 

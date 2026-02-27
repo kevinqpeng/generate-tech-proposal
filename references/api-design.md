@@ -2,39 +2,6 @@
 
 本文档定义 Controller、Service、Mapper 三层接口的设计规范和示例。
 
-## 0. 注释规范总则
-
-**Service 和 Mapper 接口统一使用简洁的单行注释风格，提升代码可读性：**
-
-✅ **推荐写法**（简洁易读）：
-```java
-// 分页查询线索池
-PageResult<LeadPoolDO> getLeadPoolPage(LeadPoolPageReqVO pageReqVO);
-
-// 统计卡片
-LeadPoolStatisticsRespVO getStatistics();
-```
-
-❌ **不推荐写法**（冗余繁琐）：
-```java
-/**
- * 分页查询线索池
- */
-PageResult<LeadPoolDO> getLeadPoolPage(LeadPoolPageReqVO pageReqVO);
-
-/**
- * 统计卡片
- */
-LeadPoolStatisticsRespVO getStatistics();
-```
-
-**注释风格要点**：
-- 使用 `//` 单行注释，而非 `/** */` 多行 javadoc
-- 注释简洁明了，一行说明方法用途
-- 注释位于方法声明上方
-- 使用中文注释，便于团队理解
-- 方法名已清晰表达意图时，注释可更简洁
-
 ## 1. 三层架构说明
 
 ```
@@ -202,36 +169,32 @@ public CommonResult<Boolean> deleteLeadPool(
 
 ## 3. Service 接口设计
 
-### 3.1 注释规范
-
-**推荐使用简洁的单行注释风格，提升代码可读性：**
+### 3.1 基本规范
 
 ```java
 public interface ModuleService {
 
-    // 分页查询
+    /**
+     * 分页查询
+     */
     PageResult<ModuleDO> getPage(ModulePageReqVO pageReqVO);
 
-    // 详情查询
+    /**
+     * 详情查询
+     */
     ModuleDO get(Long id);
 
-    // 保存（新增/修改）
+    /**
+     * 保存（新增/修改）
+     */
     Long save(ModuleSaveReqVO saveReqVO);
 
-    // 删除
+    /**
+     * 删除
+     */
     void delete(Long id);
 }
 ```
-
-**注释风格要点**：
-- 使用 `//` 单行注释，而非 `/** */` 多行 javadoc
-- 注释简洁明了，一行说明方法用途
-- 注释位于方法声明上方
-- 中文注释，便于团队理解
-
-### 3.2 基本规范
-
-Service 接口负责实现业务逻辑和事务控制，方法命名应清晰表达业务意图。
 
 ### 3.2 方法命名规范
 
@@ -250,46 +213,46 @@ Service 接口负责实现业务逻辑和事务控制，方法命名应清晰表
 ```java
 public interface LeadPoolService {
 
-    // 分页查询线索池
+    /**
+     * 分页查询公海池线索
+     */
     PageResult<LeadPoolDO> getLeadPoolPage(LeadPoolPageReqVO pageReqVO);
 
-    // 统计卡片
+    /**
+     * 获取公海池统计卡片
+     */
     LeadPoolStatisticsRespVO getStatistics();
 
-    // 获取线索详情
+    /**
+     * 获取线索详情
+     */
     LeadPoolDO getLeadPool(Long id);
 
-    // 保存线索（新增/修改）
+    /**
+     * 保存线索（新增/修改）
+     */
     Long saveLeadPool(LeadPoolSaveReqVO saveReqVO);
 
-    // 删除线索
+    /**
+     * 删除线索
+     */
     void deleteLeadPool(Long id);
 
-    // 批量分配线索
+    /**
+     * 批量分配线索
+     */
     void batchAssignLeads(List<Long> leadIds, Long ownerId);
-
-    // 领取线索（带分布式锁）
-    @Lock4j(keys = {"#leadId"}, acquireTimeout = 1000, expire = 5000)
-    void claimLead(Long leadId, Long userId);
 }
 ```
 
-**注意事项**：
-- 对于需要分布式锁的方法，使用 `@Lock4j` 注解
-- 注释应准确描述业务操作，避免模糊表述
-- 复杂业务逻辑可在注释中补充关键说明
-
 ## 4. Mapper 接口设计
 
-### 4.1 注释规范
-
-**Mapper 接口同样使用简洁的单行注释风格：**
+### 4.1 基本规范
 
 ```java
 @Mapper
 public interface ModuleMapper extends BaseMapperX<ModuleDO> {
 
-    // 分页查询
     default PageResult<ModuleDO> selectPage(ModulePageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<ModuleDO>()
             .likeIfPresent(ModuleDO::getName, reqVO.getName())
@@ -297,23 +260,8 @@ public interface ModuleMapper extends BaseMapperX<ModuleDO> {
             .betweenIfPresent(ModuleDO::getCreateTime, reqVO.getCreateTime())
             .orderByDesc(ModuleDO::getId));
     }
-
-    // 统计总数
-    default Long selectCount(ModulePageReqVO reqVO) {
-        return selectCount(new LambdaQueryWrapperX<ModuleDO>()
-            .eqIfPresent(ModuleDO::getStatus, reqVO.getStatus()));
-    }
 }
 ```
-
-**注释风格要点**：
-- 与 Service 接口保持一致的注释风格
-- 简洁描述数据库操作意图
-- 复杂查询可补充查询条件说明
-
-### 4.2 基本规范
-
-Mapper 接口负责数据库操作，继承 `BaseMapperX` 获得基础 CRUD 能力。
 
 ### 4.2 方法命名规范
 
@@ -333,7 +281,9 @@ Mapper 接口负责数据库操作，继承 `BaseMapperX` 获得基础 CRUD 能�
 @Mapper
 public interface LeadPoolMapper extends BaseMapperX<LeadPoolDO> {
 
-    // 分页查询公海池线索
+    /**
+     * 分页查询公海池线索
+     */
     default PageResult<LeadPoolDO> selectPage(LeadPoolPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<LeadPoolDO>()
             .likeIfPresent(LeadPoolDO::getBrandName, reqVO.getBrandName())
@@ -347,32 +297,24 @@ public interface LeadPoolMapper extends BaseMapperX<LeadPoolDO> {
             .orderByDesc(LeadPoolDO::getId));
     }
 
-    // 统计今日新增线索数
+    /**
+     * 统计今日新增线索数
+     */
     default Long selectTodayNewCount() {
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
         return selectCount(new LambdaQueryWrapperX<LeadPoolDO>()
             .ge(LeadPoolDO::getCreateTime, startOfDay));
     }
 
-    // 统计未分配线索数
+    /**
+     * 统计未分配线索数
+     */
     default Long selectUnassignedCount() {
         return selectCount(new LambdaQueryWrapperX<LeadPoolDO>()
             .eq(LeadPoolDO::getLeadStatus, LeadStatusEnum.UNASSIGNED));
     }
-
-    // 根据品牌名称查询线索列表
-    default List<LeadPoolDO> selectListByBrandName(String brandName) {
-        return selectList(new LambdaQueryWrapperX<LeadPoolDO>()
-            .eq(LeadPoolDO::getBrandName, brandName)
-            .orderByDesc(LeadPoolDO::getCreateTime));
-    }
 }
 ```
-
-**注意事项**：
-- 查询条件使用 `xxxIfPresent` 方法，避免空值查询
-- 统计类方法命名以 `select` 开头，清晰表达查询意图
-- 复杂查询可拆分为多个方法，提升可维护性
 
 ## 5. VO 对象设计
 

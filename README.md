@@ -4,11 +4,12 @@
 
 ## 功能特性
 
-- ✅ **数据库设计规范** - 表清单、ER 图（Mermaid）、建表 SQL、表关系说明
+- ✅ **数据库设计规范** - 表清单、ER 图（简化/详细两种格式）、建表 SQL、表关系说明
 - ✅ **接口设计规范** - Controller/Service/Mapper 三层架构设计
 - ✅ **业务流程设计** - Mermaid 流程图、流程说明、异常处理
 - ✅ **文档结构模板** - 统一的章节结构和格式规范
 - ✅ **完整示例** - 基于真实项目的设计示例
+- ✅ **详细 ER 图** - 包含完整表结构、字段类型、约束和注释的 ER 图
 
 ## 安装
 
@@ -70,7 +71,8 @@ generate-tech-proposal/
     ├── template-overview.md    # 文档结构模板
     ├── database-design.md      # 数据库设计规范
     ├── api-design.md           # 接口设计规范
-    └── business-flow.md        # 业务流程设计规范
+    ├── business-flow.md        # 业务流程设计规范
+    └── er-diagram-examples.md  # ER 图示例集（简化/详细格式）
 ```
 
 ## 生成的技术方案包含
@@ -78,6 +80,8 @@ generate-tech-proposal/
 ### 1. 数据库设计
 - 表清单（序号、表名、说明）
 - ER 图（Mermaid erDiagram）
+  - 简化格式：快速展示表关系
+  - 详细格式：包含完整字段结构、类型、约束
 - 表关系说明（1:1, 1:N, N:M）
 - 建表 SQL（完整可执行）
 
@@ -126,6 +130,7 @@ generate-tech-proposal/
 - 线索管理系统的数据库设计
 - 完整的接口设计示例
 - 多个业务流程示例
+- ER 图示例集（简化/详细格式对比）
 
 ## 贡献
 

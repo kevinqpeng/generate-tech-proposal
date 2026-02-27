@@ -10,6 +10,8 @@ description: |
 
 生成标准化、结构完整的技术设计方案文档，确保团队技术文档的一致性和完整性。
 
+**重要：默认使用详细格式的 ER 图**，包含完整的表结构、字段类型、约束和注释。
+
 ## 快速开始
 
 生成一个完整的技术方案文档，包含以下标准章节：
@@ -85,13 +87,59 @@ description: |
 
 所有流程图和 ER 图使用 **Mermaid** 语法：
 
-### ER 图示例
+### ER 图格式
+
+**默认使用详细格式**，包含完整表结构、字段类型、约束和注释。
+
+提供两种 ER 图格式，根据场景选择：
+
+#### 1. 详细 ER 图（默认格式，推荐使用）
+
+适用于详细设计文档、代码评审、数据库迁移：
 
 ```mermaid
 erDiagram
-    USER ||--o{ ORDER : places
-    ORDER ||--|{ ORDER_ITEM : contains
-    PRODUCT ||--o{ ORDER_ITEM : "ordered in"
+    lead_brand {
+        bigint id PK "雪花算法"
+        varchar brand_name "品牌名称(区分大小写)"
+        varchar brand_country "品牌国家/地区编码"
+        varchar brand_status "品牌状态:NORMAL/REVIEWING/REJECTED"
+        varchar creator "创建者"
+        datetime create_time "创建时间"
+        varchar updater "更新者"
+        datetime update_time "更新时间"
+        tinyint deleted "是否删除:0-否,1-是"
+        bigint tenant_id "租户编号"
+    }
+
+    lead_customer {
+        bigint id PK "雪花算法"
+        varchar customer_no UK "客户编号"
+        varchar customer_name "客户名称"
+        bigint brand_id FK "主关联品牌ID"
+        bigint owner_id FK "归属人ID"
+        bigint tenant_id "租户编号"
+        tinyint deleted "是否删除:0-否,1-是"
+    }
+
+    lead_brand ||--o{ lead_customer : "1:N 一品牌关联多客户"
+```
+
+**详细 ER 图要点**：
+- 字段顺序：主键 → 业务字段 → 标准字段
+- 约束标记：PK（主键）、FK（外键）、UK（唯一键）
+- 字段注释：枚举值列出所有可能值，外键说明关联表
+- 关系定义：在所有表定义后统一定义
+
+#### 2. 简化 ER 图（仅在特殊场景使用）
+
+仅在技术方案初稿、架构讨论等需要快速展示表关系时使用：
+
+```mermaid
+erDiagram
+    USER ||--o{ ORDER : "1:N 一个用户多个订单"
+    ORDER ||--|{ ORDER_ITEM : "1:N 一个订单多个明细"
+    PRODUCT ||--o{ ORDER_ITEM : "1:N 一个产品多个订单明细"
 ```
 
 ### 流程图示例
