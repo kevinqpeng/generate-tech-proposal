@@ -174,29 +174,27 @@ public CommonResult<Boolean> deleteLeadPool(
 ```java
 public interface ModuleService {
 
-    /**
-     * 分页查询
-     */
+    // 分页查询
     PageResult<ModuleDO> getPage(ModulePageReqVO pageReqVO);
 
-    /**
-     * 详情查询
-     */
+    // 详情查询
     ModuleDO get(Long id);
 
-    /**
-     * 保存（新增/修改）
-     */
+    // 保存（新增/修改）
     Long save(ModuleSaveReqVO saveReqVO);
 
-    /**
-     * 删除
-     */
+    // 删除
     void delete(Long id);
 }
 ```
 
-### 3.2 方法命名规范
+### 3.2 注释要求（强制）
+
+- Service 接口中，**每个方法签名前必须有 `//` 单行注释**
+- 注释需描述“做什么”，不要只写“方法说明”
+- 不允许输出无注释的方法签名
+
+### 3.3 方法命名规范
 
 | 操作类型 | 方法名 | 返回值 |
 |----------|--------|--------|
@@ -208,39 +206,27 @@ public interface ModuleService {
 | 删除 | delete | void |
 | 批量操作 | batch{Action} | void/List |
 
-### 3.3 完整示例
+### 3.4 完整示例
 
 ```java
 public interface LeadPoolService {
 
-    /**
-     * 分页查询公海池线索
-     */
+    // 分页查询公海池线索
     PageResult<LeadPoolDO> getLeadPoolPage(LeadPoolPageReqVO pageReqVO);
 
-    /**
-     * 获取公海池统计卡片
-     */
+    // 获取公海池统计卡片
     LeadPoolStatisticsRespVO getStatistics();
 
-    /**
-     * 获取线索详情
-     */
+    // 获取线索详情
     LeadPoolDO getLeadPool(Long id);
 
-    /**
-     * 保存线索（新增/修改）
-     */
+    // 保存线索（新增/修改）
     Long saveLeadPool(LeadPoolSaveReqVO saveReqVO);
 
-    /**
-     * 删除线索
-     */
+    // 删除线索
     void deleteLeadPool(Long id);
 
-    /**
-     * 批量分配线索
-     */
+    // 批量分配线索
     void batchAssignLeads(List<Long> leadIds, Long ownerId);
 }
 ```
@@ -263,7 +249,13 @@ public interface ModuleMapper extends BaseMapperX<ModuleDO> {
 }
 ```
 
-### 4.2 方法命名规范
+### 4.2 注释要求（强制）
+
+- Mapper 接口中，分页查询、统计查询、自定义查询等方法前必须添加 `//` 单行注释
+- 对带有业务过滤逻辑的方法（如状态过滤、数据权限过滤、时间区间过滤），注释中应简要体现
+- 不允许输出无注释的方法签名
+
+### 4.3 方法命名规范
 
 | 操作类型 | 方法名 | 说明 |
 |----------|--------|------|
@@ -275,15 +267,13 @@ public interface ModuleMapper extends BaseMapperX<ModuleDO> {
 | 更新 | update | 更新记录 |
 | 删除 | delete | 删除记录 |
 
-### 4.3 完整示例
+### 4.4 完整示例
 
 ```java
 @Mapper
 public interface LeadPoolMapper extends BaseMapperX<LeadPoolDO> {
 
-    /**
-     * 分页查询公海池线索
-     */
+    // 分页查询公海池线索
     default PageResult<LeadPoolDO> selectPage(LeadPoolPageReqVO reqVO) {
         return selectPage(reqVO, new LambdaQueryWrapperX<LeadPoolDO>()
             .likeIfPresent(LeadPoolDO::getBrandName, reqVO.getBrandName())
@@ -297,18 +287,14 @@ public interface LeadPoolMapper extends BaseMapperX<LeadPoolDO> {
             .orderByDesc(LeadPoolDO::getId));
     }
 
-    /**
-     * 统计今日新增线索数
-     */
+    // 统计今日新增线索数
     default Long selectTodayNewCount() {
         LocalDateTime startOfDay = LocalDateTime.now().with(LocalTime.MIN);
         return selectCount(new LambdaQueryWrapperX<LeadPoolDO>()
             .ge(LeadPoolDO::getCreateTime, startOfDay));
     }
 
-    /**
-     * 统计未分配线索数
-     */
+    // 统计未分配线索数
     default Long selectUnassignedCount() {
         return selectCount(new LambdaQueryWrapperX<LeadPoolDO>()
             .eq(LeadPoolDO::getLeadStatus, LeadStatusEnum.UNASSIGNED));
@@ -600,12 +586,32 @@ CREATE TABLE `system_i18n_data` (
 ### 4.2 Service 接口
 
 ​```java
-[Service 接口定义]
+public interface LeadPoolService {
+
+    // 分页查询公海池线索
+    PageResult<LeadMainDO> getLeadPoolPage(LeadPoolPageReqVO pageReqVO);
+
+    // 统计卡片
+    LeadPoolStatisticsRespVO getStatistics();
+
+    // 详情查询
+    LeadMainDO getLeadPool(Long id);
+}
 ​```
 
 ### 4.3 Mapper 接口
 
 ​```java
-[Mapper 接口定义]
+@Mapper
+public interface LeadMainMapper extends BaseMapperX<LeadMainDO> {
+
+    // 分页查询公海池线索（带数据权限过滤）
+    default PageResult<LeadMainDO> selectPage(LeadPoolPageReqVO reqVO) {
+        return selectPage(reqVO, new LambdaQueryWrapperX<LeadMainDO>()
+            .eq(LeadMainDO::getPoolType, "PUBLIC")
+            .likeIfPresent(LeadMainDO::getBrandName, reqVO.getBrandName())
+            .orderByDesc(LeadMainDO::getUpdateTime));
+    }
+}
 ​```
 ```
